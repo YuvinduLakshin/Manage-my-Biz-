@@ -1,2 +1,2 @@
-- [ ] Trigger EAS Build for Android APK
-- [ ] Monitor build status and provide URL to user
+- [x] Trigger EAS Build for Android APK
+- [x] Monitor build status and provide URL to user

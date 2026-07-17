@@ -1,31 +1,34 @@
-# Implementation Plan: Generate APK for Android
+# Implementation Plan: Generate APK Locally (Native Workflow)
 
-This plan outlines the steps to build an APK file for the "Manage my BiZ" Expo project using EAS Build.
+This plan outlines how to build an APK file directly from your local machine using the generated Android project, instead of relying on EAS cloud builds.
 
 ## User Review Required
 
-> [!IMPORTANT]
-> The build process will be performed using **EAS Build (Cloud)**. This requires an active internet connection and will use your Expo account's build concurrency/credits.
+> [!NOTE]
+> Local builds require a functional Java Development Kit (JDK) and Android SDK. If these are not configured on your machine, the build may fail.
 >
-> Once the build is triggered, you will receive a link to the Expo dashboard where you can monitor the progress and download the APK once it's finished.
+> A release build (`assembleRelease`) will require you to set up signing credentials (keystore) if you want to install it on real devices outside of debugging.
 
 ## Proposed Changes
 
-### Configuration Check
-- Verified `app.json` contains the necessary Android configuration:
-  - Package name: `com.yuvindu.managemybiz`
-  - Project ID: `8cb20e19-d47c-437b-af84-df94334a3ce7`
-- Verified `eas.json` has a `preview` profile configured for APK distribution.
+### Build Methods
 
-### Build Execution
-The build will be triggered using the following command:
+#### Option 1: Using Android Studio (Recommended for beginners)
+1.  Open the `android` folder in Android Studio.
+2.  Wait for Gradle sync to finish.
+3.  Go to the top menu: **Build** > **Build Bundle(s) / APK(s)** > **Build APK(s)**.
+4.  Android Studio will notify you when it's done and provide a "locate" link to find the `.apk` file.
+
+#### Option 2: Using the Command Line
+You can run the Gradle wrapper directly from your project root:
 ```bash
-npx eas-cli build -p android --profile preview
+cd android && ./gradlew assembleDebug
 ```
+The resulting APK will be located at: `android/app/build/outputs/apk/debug/app-debug.apk`
 
 ## Verification Plan
 
 ### Manual Verification
-1.  Run the build command.
-2.  Provide the build URL to the user.
-3.  User can download the APK from the Expo dashboard once the build completes.
+1.  Run the Gradle build command.
+2.  Verify the existence of the APK file in the output directory.
+3.  Attempt to install the APK on an emulator or device.
