@@ -120,6 +120,9 @@ export default function App() {
             profile={profile}
             quotations={quotations}
             onQuotationsUpdate={setQuotations}
+            orders={orders}
+            onOrdersUpdate={setOrders}
+            setActiveTab={setActiveTab}
           />
         );
       case 'orders':
@@ -128,6 +131,8 @@ export default function App() {
             profile={profile}
             orders={orders}
             onOrdersUpdate={setOrders}
+            transactions={transactions}
+            onTransactionsUpdate={setTransactions}
           />
         );
       case 'finance':
@@ -274,9 +279,9 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 56,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderBottomWidth: 1.5,
+    borderBottomColor: 'rgba(226, 232, 240, 0.8)',
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
@@ -291,9 +296,9 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     height: 64,
-    backgroundColor: '#FFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderTopWidth: 1.5,
+    borderTopColor: 'rgba(226, 232, 240, 0.8)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',

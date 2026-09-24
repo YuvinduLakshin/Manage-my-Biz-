@@ -14,13 +14,15 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BusinessProfile, Order, OrderStatus } from '../types';
-import { saveOrders } from '../utils/storage';
+import { BusinessProfile, Order, OrderStatus, Transaction } from '../types';
+import { saveOrders, saveTransactions } from '../utils/storage';
 
 interface OrdersScreenProps {
   profile: BusinessProfile;
   orders: Order[];
   onOrdersUpdate: (updatedOrders: Order[]) => void;
+  transactions: Transaction[];
+  onTransactionsUpdate: (updatedTransactions: Transaction[]) => void;
 }
 
 const STATUS_FILTERS: { label: string; value: 'all' | OrderStatus }[] = [
@@ -35,6 +37,8 @@ export default function OrdersScreen({
   profile,
   orders,
   onOrdersUpdate,
+  transactions = [],
+  onTransactionsUpdate,
 }: OrdersScreenProps) {
   const [filter, setFilter] = useState<'all' | OrderStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,6 +56,89 @@ export default function OrdersScreen({
 
   // Edit Order Mode (optional override, we will use it for editing orders)
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+
+  // Expanded card state
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [newTaskText, setNewTaskText] = useState('');
+
+  // Toggle task completion
+  const handleToggleTask = async (orderId: string, taskId: string) => {
+    const updated = orders.map((o) => {
+      if (o.id === orderId) {
+        const currentTasks = o.tasks || [];
+        const updatedTasks = currentTasks.map((t) =>
+          t.id === taskId ? { ...t, completed: !t.completed } : t
+        );
+        return { ...o, tasks: updatedTasks };
+      }
+      return o;
+    });
+    await saveOrders(updated);
+    onOrdersUpdate(updated);
+  };
+
+  // Add task to order
+  const handleAddTask = async (orderId: string) => {
+    if (!newTaskText.trim()) return;
+    const updated = orders.map((o) => {
+      if (o.id === orderId) {
+        const currentTasks = o.tasks || [];
+        const newTask = {
+          id: Date.now().toString(),
+          text: newTaskText.trim(),
+          completed: false,
+        };
+        return { ...o, tasks: [...currentTasks, newTask] };
+      }
+      return o;
+    });
+    await saveOrders(updated);
+    onOrdersUpdate(updated);
+    setNewTaskText('');
+  };
+
+  // Delete task from order
+  const handleDeleteTask = async (orderId: string, taskId: string) => {
+    const updated = orders.map((o) => {
+      if (o.id === orderId) {
+        const currentTasks = o.tasks || [];
+        const updatedTasks = currentTasks.filter((t) => t.id !== taskId);
+        return { ...o, tasks: updatedTasks };
+      }
+      return o;
+    });
+    await saveOrders(updated);
+    onOrdersUpdate(updated);
+  };
+
+  // Log payment of closed order to Finance Ledger
+  const handleLogPayment = async (order: Order) => {
+    Alert.alert(
+      'Log Payment',
+      `Would you like to record this payment of ${currency}${order.amount.toFixed(2)} in the Finance Ledger?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Income',
+          onPress: async () => {
+            const newTx: Transaction = {
+              id: Date.now().toString(),
+              type: 'income',
+              amount: order.amount,
+              category: 'Sales',
+              description: `Payment for Order ${order.orderNumber} (${order.clientName})`,
+              date: new Date().toISOString().split('T')[0],
+            };
+
+            const updatedTxs = [newTx, ...transactions];
+            await saveTransactions(updatedTxs);
+            onTransactionsUpdate(updatedTxs);
+            Alert.alert('Success', 'Payment transaction logged to Finance Ledger!');
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     if (isModalVisible && !editingOrderId) {
@@ -153,6 +240,12 @@ export default function OrdersScreen({
     });
     await saveOrders(updated);
     onOrdersUpdate(updated);
+
+    if (nextStatus === 'closed') {
+      setTimeout(() => {
+        handleLogPayment(order);
+      }, 500);
+    }
   };
 
   // Delete Order Handler
@@ -265,6 +358,11 @@ export default function OrdersScreen({
           contentContainerStyle={styles.listContentContainer}
           renderItem={({ item }) => {
             const badge = getBadgeStyle(item.status);
+            const currentTasks = item.tasks || [];
+            const totalTasks = currentTasks.length;
+            const completedTasks = currentTasks.filter((t) => t.completed).length;
+            const percentCompleted = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            const isExpanded = expandedOrderId === item.id;
             return (
               <View style={styles.orderCard}>
                 <View style={styles.orderCardTop}>
@@ -293,6 +391,74 @@ export default function OrdersScreen({
                     <Text style={styles.clientPhoneText}>{item.clientPhone}</Text>
                   </TouchableOpacity>
                 ) : null}
+
+                {/* Task Checklist progress indicator */}
+                <TouchableOpacity
+                  style={styles.taskSummaryRow}
+                  onPress={() => setExpandedOrderId(isExpanded ? null : item.id)}
+                >
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="checkbox-outline" size={15} color="#4F46E5" style={{ marginRight: 6 }} />
+                    <Text style={styles.taskSummaryText}>
+                      Tasks: {completedTasks}/{totalTasks} ({percentCompleted}%)
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={isExpanded ? 'chevron-up-outline' : 'chevron-down-outline'}
+                    size={15}
+                    color="#64748B"
+                  />
+                </TouchableOpacity>
+
+                {/* Progress bar line */}
+                {totalTasks > 0 && (
+                  <View style={styles.progressBarTrack}>
+                    <View style={[styles.progressBarFill, { width: `${percentCompleted}%` }]} />
+                  </View>
+                )}
+
+                {/* Expanded task checklist area */}
+                {isExpanded && (
+                  <View style={styles.expandedTasksBox}>
+                    {currentTasks.map((t) => (
+                      <View key={t.id} style={styles.taskChecklistItem}>
+                        <TouchableOpacity
+                          style={styles.taskCheckBtn}
+                          onPress={() => handleToggleTask(item.id, t.id)}
+                        >
+                          <Ionicons
+                            name={t.completed ? 'checkbox' : 'square-outline'}
+                            size={18}
+                            color={t.completed ? '#4F46E5' : '#94A3B8'}
+                          />
+                          <Text style={[styles.taskItemText, t.completed && styles.taskItemTextCompleted]}>
+                            {t.text}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleDeleteTask(item.id, t.id)}>
+                          <Ionicons name="close-outline" size={18} color="#EF4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    {/* Add Inline Task Input */}
+                    <View style={styles.addTaskRow}>
+                      <TextInput
+                        style={styles.addTaskInput}
+                        placeholder="Add checklist task..."
+                        placeholderTextColor="#94A3B8"
+                        value={newTaskText}
+                        onChangeText={setNewTaskText}
+                      />
+                      <TouchableOpacity
+                        style={styles.addTaskBtn}
+                        onPress={() => handleAddTask(item.id)}
+                      >
+                        <Ionicons name="add" size={16} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
 
                 {item.notes ? (
                   <View style={styles.notesBox}>
@@ -340,6 +506,15 @@ export default function OrdersScreen({
                         onPress={() => transitionStatus(item, 'closed')}
                       >
                         <Text style={[styles.transitionBtnText, { color: '#059669' }]}>Close Order</Text>
+                      </TouchableOpacity>
+                    )}
+                    {item.status === 'closed' && (
+                      <TouchableOpacity
+                        style={[styles.transitionBtn, { backgroundColor: '#ECFDF5', flexDirection: 'row', alignItems: 'center' }]}
+                        onPress={() => handleLogPayment(item)}
+                      >
+                        <Ionicons name="wallet-outline" size={14} color="#059669" style={{ marginRight: 4 }} />
+                        <Text style={[styles.transitionBtnText, { color: '#059669' }]}>Log Payment</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -597,17 +772,17 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   orderCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
-    elevation: 1,
+    elevation: 2,
   },
   orderCardTop: {
     flexDirection: 'row',
@@ -807,5 +982,88 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  taskSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  taskSummaryText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  progressBarTrack: {
+    height: 4,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 2,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#4F46E5',
+    borderRadius: 2,
+  },
+  expandedTasksBox: {
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  taskChecklistItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  taskCheckBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  taskItemText: {
+    fontSize: 13,
+    color: '#334155',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  taskItemTextCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#94A3B8',
+  },
+  addTaskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addTaskInput: {
+    flex: 1,
+    height: 36,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    fontSize: 12,
+    color: '#0F172A',
+  },
+  addTaskBtn: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#4F46E5',
+    borderRadius: 6,
+    marginLeft: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

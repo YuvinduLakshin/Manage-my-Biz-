@@ -14,20 +14,26 @@ import {
   Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BusinessProfile, Quotation, QuotationItem } from '../types';
-import { saveQuotations } from '../utils/storage';
+import { BusinessProfile, Quotation, QuotationItem, Order, AppTab } from '../types';
+import { saveQuotations, saveOrders } from '../utils/storage';
 import { generateQuotationPDF, shareQuotationPDF } from '../utils/pdfGenerator';
 
 interface QuotationScreenProps {
   profile: BusinessProfile;
   quotations: Quotation[];
   onQuotationsUpdate: (updatedQuotations: Quotation[]) => void;
+  orders: Order[];
+  onOrdersUpdate: (updatedOrders: Order[]) => void;
+  setActiveTab: (tab: AppTab) => void;
 }
 
 export default function QuotationScreen({
   profile,
   quotations,
   onQuotationsUpdate,
+  orders = [],
+  onOrdersUpdate,
+  setActiveTab,
 }: QuotationScreenProps) {
   // Navigation inside the tab: 'list' or 'create'
   const [mode, setMode] = useState<'list' | 'create'>('list');
@@ -73,6 +79,58 @@ export default function QuotationScreen({
       setDiscount('0');
     }
   }, [mode, profile, quotations.length]);
+
+  const handleConvertToOrder = async (quote: Quotation) => {
+    Alert.alert(
+      'Convert Quotation',
+      `Are you sure you want to convert Quotation ${quote.quoteNumber} into an active Customer Order?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Convert',
+          onPress: async () => {
+            const itemsSummary = quote.items
+              .map((item) => `${item.name} (x${item.quantity})`)
+              .join(', ');
+
+            const nextOrderNum = `ORD-${1000 + orders.length + 1}`;
+
+            const newOrder: Order = {
+              id: Date.now().toString(),
+              orderNumber: nextOrderNum,
+              clientName: quote.clientName,
+              clientPhone: '',
+              description: itemsSummary,
+              amount: quote.grandTotal,
+              status: 'pending',
+              date: new Date().toISOString().split('T')[0],
+              notes: `Generated from Quotation ${quote.quoteNumber}`,
+              tasks: [],
+            };
+
+            const updatedOrders = [newOrder, ...orders];
+            await saveOrders(updatedOrders);
+            onOrdersUpdate(updatedOrders);
+
+            Alert.alert(
+              'Success',
+              `Quotation converted successfully! Order ${nextOrderNum} has been created.`,
+              [
+                {
+                  text: 'View Order',
+                  onPress: () => setActiveTab('orders'),
+                },
+                {
+                  text: 'Dismiss',
+                  style: 'cancel',
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
 
   const currency = profile.currency || '$';
 
@@ -275,6 +333,13 @@ export default function QuotationScreen({
                       <Text style={styles.quoteCardDate}>Expires: {item.validUntil}</Text>
                     </View>
                     <View style={styles.quoteCardActions}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.convertBtn]}
+                        onPress={() => handleConvertToOrder(item)}
+                      >
+                        <Ionicons name="clipboard-outline" size={16} color="#059669" />
+                        <Text style={styles.convertBtnText}>Order</Text>
+                      </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.actionBtn, styles.shareBtn]}
                         onPress={() => handleShareExisting(item)}
@@ -670,17 +735,17 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   quoteCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
-    elevation: 1,
+    elevation: 2,
   },
   quoteCardTop: {
     flexDirection: 'row',
@@ -737,6 +802,16 @@ const styles = StyleSheet.create({
   },
   shareBtnText: {
     color: '#4F46E5',
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  convertBtn: {
+    backgroundColor: '#ECFDF5',
+    marginRight: 8,
+  },
+  convertBtnText: {
+    color: '#059669',
     fontSize: 12,
     fontWeight: '700',
     marginLeft: 4,

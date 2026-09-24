@@ -208,6 +208,12 @@ export default function SettingsScreen({ profile, onProfileUpdate }: SettingsScr
           <Ionicons name="save-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
           <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Settings'}</Text>
         </TouchableOpacity>
+
+        {/* Footer Watermark */}
+        <View style={styles.footerWatermark}>
+          <Ionicons name="shield-checkmark" size={14} color="#94A3B8" style={{ marginRight: 4 }} />
+          <Text style={styles.footerWatermarkText}>Protected and Powered By Pexa Core</Text>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -219,15 +225,17 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.03,
     shadowRadius: 12,
-    elevation: 3,
+    elevation: 2,
   },
   cardTitle: {
     fontSize: 18,
@@ -338,5 +346,19 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  footerWatermark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 32,
+    marginBottom: 8,
+    opacity: 0.8,
+  },
+  footerWatermarkText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });

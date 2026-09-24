@@ -43,6 +43,12 @@ export interface Transaction {
 
 export type OrderStatus = 'pending' | 'ongoing' | 'pending_handover' | 'closed';
 
+export interface OrderTask {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -53,6 +59,8 @@ export interface Order {
   status: OrderStatus;
   date: string;
   notes: string;
+  tasks?: OrderTask[];
 }
 
 export type AppTab = 'dashboard' | 'quotation' | 'orders' | 'finance' | 'settings';
+
